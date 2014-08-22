@@ -1,0 +1,33 @@
+{
+  "name": "spread2json",
+  "version": "0.0.1",
+  "description": "spreadsheet convert json",
+  "main": "index.js",
+  "dependencies": {
+    "async": "^0.9.0",
+    "googleapis": "^1.0.2",
+    "lodash": "^2.4.1"
+  },
+  "devDependencies": {
+    "jshint": "^2.5.2",
+    "mocha": "^1.21.3",
+    "should": "^4.0.4",
+    "sinon": "^1.10.3"
+  },
+  "scripts": {
+    "test": "mocha -r should -R spec --recursive test",
+    "jshint": "jshint lib/*.js"
+  },
+  "keywords": [
+    "spread2json",
+    "spreadsheet",
+    "excel",
+    "xlsx",
+    "parse",
+    "json",
+    "googleapi",
+    "googleapis"
+  ],
+  "author": "Yuhei Aihara",
+  "license": "MIT"
+}
