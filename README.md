@@ -125,6 +125,24 @@ Specify the key name.
 * `:date` Use when the parameters of unix time.
 * `:index` Use when the array of array.
 
+|   | A             | B      | C     | D          | E            | F                   |
+|:-:|:--------------|:-------|:------|:-----------|:-------------|:--------------------|
+| 1 | {}            |        |       |            |              |                     |
+| 2 | _id           | #arr   | $sarr | num:number | bool:boolean | date:date           |
+| 3 |               |        |       |            |              |                     |
+| 4 | normal_string | array1 | a,b,c | 1          | FALSE        | 2014/08/01 10:00:00 |
+| 5 |               | array2 |       |            |              |                     |
+```
+{
+    _id: 'normal_string',
+    arr: [ 'array1', 'array2' ],
+    sarr: [ 'a', 'b', 'c' ],
+    num: 1,
+    bool: false,
+    date: 1406854800000 // < new Date('2014/08/01 10:00:00').getTime() user env GMT
+}
+```
+
 ### Example
 An example of a complex format.
 
