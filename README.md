@@ -166,5 +166,9 @@ spread2json.getWorksheetDatas(SPREADSHEET_KEY, WORKSHEET_KEYS, function(err, she
 });
 ```
 
+### Sample
+sample project.
+[spread2json_sample](https://github.com/yuhei-a/spread2json_sample)
+
 ## Test
 Run `npm test` and `npm run-script jshint`

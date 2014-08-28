@@ -18,6 +18,10 @@
     "test": "mocha -r should -R spec --recursive test",
     "jshint": "jshint lib/*.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/yuhei-a/spread2json.git"
+  },
   "keywords": [
     "spread2json",
     "spreadsheet",
@@ -29,5 +33,9 @@
     "googleapis"
   ],
   "author": "Yuhei Aihara",
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yuhei-a/spread2json/issues"
+  },
+  "homepage": "https://github.com/yuhei-a/spread2json"
 }
