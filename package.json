@@ -1,6 +1,6 @@
 {
   "name": "spread2json",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "spreadsheet convert json",
   "main": "index.js",
   "dependencies": {
