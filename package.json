@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "async": "^0.9.0",
-    "googleapis": "^1.0.2",
+    "googleapis": "^1.0.21",
     "lodash": "^2.4.1"
   },
   "devDependencies": {
@@ -23,14 +23,15 @@
     "url": "git://github.com/yuhei-a/spread2json.git"
   },
   "keywords": [
-    "spread2json",
     "spreadsheet",
+    "goggle",
+    "googleapi",
+    "googleapis",
     "excel",
     "xlsx",
     "parse",
     "json",
-    "googleapi",
-    "googleapis"
+    "spread2json"
   ],
   "author": "Yuhei Aihara",
   "license": "MIT",
