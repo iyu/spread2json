@@ -6,7 +6,8 @@
   "dependencies": {
     "async": "^1.0.0",
     "googleapis": "^2.0.4",
-    "lodash": "^3.9.3"
+    "lodash": "^3.9.3",
+    "xml2json": "^0.6.2"
   },
   "devDependencies": {
     "jscs": "^1.13.1",
