@@ -25,7 +25,7 @@ describe('spread2json', function() {
     sandbox.stub(api, 'getWorksheet').yields(null, mock.getWorksheet);
     var stubGetCells = sandbox.stub(api, 'getCells');
     for (var key in mock.getCells) {
-      stubGetCells.withArgs(SPREADSHEET_KEY, key).yields(null, mock.getCells[key]);
+      stubGetCells.withArgs(undefined, SPREADSHEET_KEY, key).yields(null, mock.getCells[key]);
     }
   });
 

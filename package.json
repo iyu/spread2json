@@ -4,11 +4,13 @@
   "description": "spreadsheet convert json",
   "main": "index.js",
   "dependencies": {
-    "async": "^0.9.0",
-    "googleapis": "^1.0.21",
-    "lodash": "^2.4.1"
+    "async": "^1.0.0",
+    "googleapis": "^2.0.4",
+    "lodash": "^3.9.3"
   },
   "devDependencies": {
+    "jscs": "^1.13.1",
+    "jscs-jsdoc": "^1.0.1",
     "jshint": "^2.5.2",
     "mocha": "^1.21.3",
     "should": "^4.0.4",
@@ -16,11 +18,11 @@
   },
   "scripts": {
     "test": "mocha -r should -R spec --recursive test",
-    "jshint": "jshint lib/*.js"
+    "checkstyle": "jshint . && jscs ."
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/yuhei-a/spread2json.git"
+    "url": "git://github.com/iyu/spread2json.git"
   },
   "keywords": [
     "spreadsheet",
@@ -36,7 +38,7 @@
   "author": "Yuhei Aihara",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yuhei-a/spread2json/issues"
+    "url": "https://github.com/iyu/spread2json/issues"
   },
-  "homepage": "https://github.com/yuhei-a/spread2json"
+  "homepage": "https://github.com/iyu/spread2json"
 }

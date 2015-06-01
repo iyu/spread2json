@@ -99,7 +99,10 @@ spread2json.setup({
         client_id: 'YOUR CLIENT ID HERE',
         client_secret: 'YOUR CLIENT SECRET HERE',
         redirect_url: 'http://localhost',
-        token_path: './dist/token.json'
+        token_file: {
+          use: true,
+          path: './dist/token.json'
+        }
     }
 });
 ```
@@ -147,7 +150,7 @@ Specify the key name.
 An example of a complex format.
 
 
-[test.xlsx](https://github.com/yuhei-a/excel2json/raw/master/test/data/test.xlsx) > [test.json](https://github.com/yuhei-a/excel2json/blob/master/test/data/test.json)
+[test.xlsx](https://github.com/iyu/excel2json/raw/master/test/data/test.xlsx) > [test.json](https://github.com/iyu/excel2json/blob/master/test/data/test.json)
 ```
 var spread2json = require('spread2json');
 var SPREADSHEET_KEY = '1YXVzaaxqkPKsr-excIOXScnTQC7y_DKrUKs0ukzSIgo';
@@ -168,7 +171,12 @@ spread2json.getWorksheetDatas(SPREADSHEET_KEY, WORKSHEET_KEYS, function(err, she
 
 ### Sample
 sample project.
-[spread2json_sample](https://github.com/yuhei-a/spread2json_sample)
+[spread2json_sample](https://github.com/iyu/spread2json_sample)
 
-## Test
-Run `npm test` and `npm run-script jshint`
+## Contribution
+1. Fork it ( [https://github.com/iyu/spread2json/fork](https://github.com/iyu/spread2json/fork) )
+2. Create a feature branch
+3. Commit your changes
+4. Rebase your local changes against the master branch
+5. Run test suite with the `npm test; npm run-script checkstyle` command and confirm that it passes
+5. Create new Pull Request

@@ -1,0 +1,45 @@
+{
+  "plugins": ["jscs-jsdoc"],
+
+  "excludeFiles": ["node_modules", "dist"],
+  "disallowKeywords": ["with"],
+  "disallowMixedSpacesAndTabs": true,
+  "disallowMultipleLineStrings": true,
+  "disallowNewlineBeforeBlockStatements": true,
+  "disallowSpaceAfterObjectKeys": "ignoreMultiLine",
+  "disallowSpaceAfterPrefixUnaryOperators": ["!"],
+  "disallowSpaceBeforeBinaryOperators": [","],
+  "disallowSpacesInAnonymousFunctionExpression": {
+    "beforeOpeningRoundBrace": true
+  },
+  "disallowSpacesInFunctionDeclaration": {
+    "beforeOpeningRoundBrace": true
+  },
+  "disallowSpacesInNamedFunctionExpression": {
+    "beforeOpeningRoundBrace": true
+  },
+  "disallowSpacesInsideParentheses": true,
+  "disallowTrailingComma": true,
+  "disallowTrailingWhitespace": true,
+  "jsDoc": {
+    "checkAnnotations": true,
+    "checkParamNames": true,
+    "checkRedundantParams": true,
+    "checkRedundantReturns": true,
+    "checkReturnTypes": true,
+    "checkTypes": "strictNativeCase",
+    "requireHyphenBeforeDescription": true,
+    "requireParamTypes": true
+  },
+  "requireSpaceAfterKeywords": ["if", "else", "for", "while", "do", "switch", "return", "try", "catch"],
+  "requireSpacesInFunction": {
+    "beforeOpeningCurlyBrace": true
+  },
+  "validateParameterSeparator": ", ",
+  "requireCurlyBraces": ["for", "while", "do", "try", "catch"],
+  "requireSpaceAfterBinaryOperators": ["?", ":", "+", "-", "/", "*", "%", "==", "===", "!=", "!==", ">", ">=", "<", "<=", "&&", "||"],
+  "requireSpaceBeforeBinaryOperators": ["?", ":", "+", "-", "/", "*", "%", "==", "===", "!=", "!==", ">", ">=", "<", "<=", "&&", "||"],
+  "disallowMultipleLineBreaks": true,
+  "disallowKeywordsOnNewLine": ["else"],
+  "requireLineFeedAtFileEnd": true
+}
