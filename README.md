@@ -90,21 +90,21 @@ Setup options.
 var spread2json = require('spread2json');
 
 spread2json.setup({
-    option_cell: 'A1',    // Cell with a custom sheet option. It is not yet used now. (default: 'A1'
-    attr_line: 2,       // Line with a data attribute. (default: 2
-    desc_line: 3,       // Line with a attribute description. (default: 3
-    data_line: 4,       // Line with a data. (default: 4
-    ref_key: '_id',       // ref key. (default: '_id'
-    logger: customLogger, // custom Logger
-    api: {
-        client_id: 'YOUR CLIENT ID HERE',
-        client_secret: 'YOUR CLIENT SECRET HERE',
-        redirect_url: 'http://localhost',
-        token_file: {
-          use: true,
-          path: './dist/token.json'
-        }
+  option_cell: 'A1',  // Cell with a custom sheet option. It is not yet used now. (default: 'A1'
+  attr_line: 2,       // Line with a data attribute. (default: 2
+  desc_line: 3,       // Line with a attribute description. (default: 3
+  data_line: 4,       // Line with a data. (default: 4
+  ref_keys: ['_id'],  // ref key. (default: ['_id']
+  logger: customLogger, // custom Logger
+  api: {
+    client_id: 'YOUR CLIENT ID HERE',
+    client_secret: 'YOUR CLIENT SECRET HERE',
+    redirect_url: 'http://localhost',
+    token_file: {
+      use: true,
+      path: './dist/token.json'
     }
+  }
 });
 ```
 
@@ -115,7 +115,7 @@ sheet option. setting with optionCell (default: 'A1'
 * `key`
 * `attr_line`
 * `data_line`
-* `ref_key`
+* `ref_keys`
 
 
 ### Attribute
