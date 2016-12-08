@@ -6,8 +6,7 @@
   "dependencies": {
     "googleapis": "^15.0.0",
     "lodash": "^4.17.2",
-    "neo-async": "^2.0.0",
-    "xml2json": "^0.10.0"
+    "neo-async": "^2.0.0"
   },
   "devDependencies": {
     "jscs": "^3.0.7",
