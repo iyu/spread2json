@@ -55,8 +55,8 @@ Sheet1
 var spread2json = require('spread2json');
 
 var spreadsheetKye = 'spreadsheetkey';
-var worksheetIds = ['sheet1'];
-spread2json.getWorksheetDatas(spreadsheetKey, worksheetIds, function(err, data) {
+var worksheetNames = ['Sheet1'];
+spread2json.getWorksheetDatas(spreadsheetKey, worksheetNames, function(err, data) {
     console.log(data);
     // [{
     //    name: 'Sheet1',            // sheet name
@@ -145,29 +145,6 @@ Specify the key name.
     bool: false,
     date: 1406854800000 // < new Date('2014/08/01 10:00:00').getTime() user env GMT
 }
-```
-
-### Example
-An example of a complex format.
-
-
-[test.xlsx](https://github.com/iyu/excel2json/raw/master/test/data/test.xlsx) > [test.json](https://github.com/iyu/excel2json/blob/master/test/data/test.json)
-```
-var spread2json = require('spread2json');
-var SPREADSHEET_KEY = '1YXVzaaxqkPKsr-excIOXScnTQC7y_DKrUKs0ukzSIgo';
-var WORKSHEET_KEYS = [
-    'od6',
-    'oat5a13',
-    'o7qj5m0',
-    'ocxr3gc',
-    'o139ph2',
-    'opanz8'
-];
-spread2json.getWorksheetDatas(SPREADSHEET_KEY, WORKSHEET_KEYS, function(err, sheetDatas) {
-    spread2json.toJson(sheetDatas, function(err, result) {
-        fs.writeFileSync('test.json', JSON.stringify(result, null, 4));
-    });
-});
 ```
 
 ### Sample
