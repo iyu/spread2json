@@ -1,3 +1,6 @@
+[![NPM version][npm-image]][npm-url]
+[![Downloads][downloads-image]][downloads-url]
+
 Spread2Json
 ==========
 
@@ -158,3 +161,8 @@ sample project.
 4. Rebase your local changes against the master branch
 5. Run test suite with the `npm test; npm run-script checkstyle` command and confirm that it passes
 5. Create new Pull Request
+
+[npm-image]: https://img.shields.io/npm/v/spread2json.svg?style=flat-square
+[npm-url]: https://www.npmjs.com/package/spread2json
+[downloads-image]: https://img.shields.io/npm/dm/spread2json.svg?style=flat-square
+[downloads-url]: https://www.npmjs.com/package/spread2json
