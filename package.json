@@ -1,9 +1,11 @@
 {
   "name": "spread2json",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "spreadsheet convert json",
   "main": "index.js",
-  "engines" : { "node" : ">=4" },
+  "engines": {
+    "node": ">=4"
+  },
   "dependencies": {
     "googleapis": "^15.0.0",
     "lodash": "^4.17.2",
