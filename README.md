@@ -11,13 +11,14 @@ example SpreadSheet data
 |   | A      | B        | C                | D |
 |:-:|:-------|:---------|:-----------------|---|
 | 1 | {}     |          |                  |   |
-| 2 | _id    | obj.code | obj.value:number |   |
+| 2 | \_id   | obj.code | obj.value:number |   |
 | 3 |        |          |                  |   |
 | 4 | first  | one      | 1                |   |
 | 5 | second | two      | 2                |   |
 | 6 |        |          |                  |   |
+
 converted to Object
-```
+```js
 [
     {
         _id: 'first',
@@ -48,13 +49,14 @@ example
 |   | A              | B        | C                | D |
 |:-:|:---------------|:---------|:-----------------|---|
 | 1 | {name: 'Test'} |          |                  |   |
-| 2 | _id            | obj.code | obj.value:number |   |
+| 2 | \_id           | obj.code | obj.value:number |   |
 | 3 |                |          |                  |   |
 | 4 | first          | one      | 1                |   |
 | 5 | second         | two      | 2                |   |
 | 6 |                |          |                  |   |
+
 Sheet1
-```
+```js
 var spread2json = require('spread2json');
 
 var spreadsheetKye = 'spreadsheetkey';
@@ -89,7 +91,7 @@ spread2json.getWorksheetDatas(spreadsheetKey, worksheetNames, function(err, data
 
 ### Setup
 Setup options.
-```
+```js
 var spread2json = require('spread2json');
 
 spread2json.setup({
@@ -135,9 +137,9 @@ Specify the key name.
 |   | A             | B      | C     | D          | E            | F                   |
 |:-:|:--------------|:-------|:------|:-----------|:-------------|:--------------------|
 | 1 | {}            |        |       |            |              |                     |
-| 2 | _id           | #arr   | $sarr | num:number | bool:boolean | date:date           |
+| 2 | \_id           | #arr   | $sarr | num:number | bool:boolean | date:date           |
 | 3 |               |        |       |            |              |                     |
-| 4 | normal_string | array1 | a,b,c | 1          | FALSE        | 2014/08/01 10:00:00 |
+| 4 | normal\_string | array1 | a,b,c | 1          | FALSE        | 2014/08/01 10:00:00 |
 | 5 |               | array2 |       |            |              |                     |
 ```
 {
@@ -159,7 +161,7 @@ sample project.
 2. Create a feature branch
 3. Commit your changes
 4. Rebase your local changes against the master branch
-5. Run test suite with the `npm test; npm run-script checkstyle` command and confirm that it passes
+5. Run test suite with the `npm test; npm run lint` command and confirm that it passes
 5. Create new Pull Request
 
 [npm-image]: https://img.shields.io/npm/v/spread2json.svg?style=flat-square
