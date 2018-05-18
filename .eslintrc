@@ -15,6 +15,7 @@ rules:
   no-param-reassign: off
   no-plusplus: [error, { allowForLoopAfterthoughts: true }]
   no-underscore-dangle: off
+  prefer-destructuring: off
   prefer-rest-params: off
   prefer-spread: off
   strict: [error, global]

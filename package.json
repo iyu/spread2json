@@ -7,15 +7,15 @@
     "node": ">=4"
   },
   "dependencies": {
-    "googleapis": "^15.0.0",
-    "lodash": "^4.17.2",
+    "googleapis": "^30.0.0",
+    "lodash": "^4.17.10",
     "neo-async": "^2.0.0"
   },
   "devDependencies": {
-    "eslint": "^3.19.0",
-    "eslint-config-airbnb-base": "^11.2.0",
-    "eslint-plugin-import": "^2.6.0",
-    "mocha": "^3.2.0",
+    "eslint": "^4.19.1",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.12.0",
+    "mocha": "^5.1.1",
     "should": "^11.1.1",
     "sinon": "^1.10.3"
   },
