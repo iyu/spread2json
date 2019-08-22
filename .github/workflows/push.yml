@@ -1,0 +1,12 @@
+name: triggered on pushes
+
+on: [push]
+
+jobs:
+  build:
+    name: ESLint
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: hallee/eslint-action@master
