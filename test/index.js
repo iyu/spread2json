@@ -1,11 +1,9 @@
-'use strict';
-
 const should = require('should');
 const sinon = require('sinon');
 
 const _ = require('lodash');
 const spread2json = require('../');
-const api = require('../lib/api');
+const { default: api } = require('../lib/api');
 
 const opts = require('./opts');
 const mock = require('./mock');
@@ -27,10 +25,10 @@ describe('spread2json', () => {
   before(() => {
     spread2json.setup({ api: opts.installed });
     const sandbox = sinon.sandbox.create();
-    sandbox.stub(api, 'getWorksheet').yields(null, mock.getWorksheet);
+    sandbox.stub(api, 'getWorksheet').resolves(mock.getWorksheet);
     const stubGetList = sandbox.stub(api, 'getList');
     _.forEach(mock.getList, (d, key) => {
-      stubGetList.withArgs(undefined, SPREADSHEET_KEY, key).yields(null, mock.getList[key]);
+      stubGetList.withArgs(undefined, SPREADSHEET_KEY, key).resolves(mock.getList[key]);
     });
   });
 

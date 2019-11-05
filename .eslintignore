@@ -1,1 +1,4 @@
 dist/
+lib/*.js
+lib/**/*.js
+index.js

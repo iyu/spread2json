@@ -1,17 +1,17 @@
 /**
  * @fileOverview spread sheet api
- * @name api.js
+ * @name api
  * @author Yuhei Aihara <yu.e.yu.4119@gmail.com>
  * https://github.com/iyu/spread2json
  */
 
-'use strict';
+import fs from 'fs';
+import path from 'path';
 
-const fs = require('fs');
-const path = require('path');
-
-const _ = require('lodash');
-const google = require('googleapis').google;
+import _ from 'lodash';
+import { google, drive_v3, sheets_v4 } from 'googleapis';
+import { OAuth2Client } from 'googleapis-common';
+import { Credentials } from 'google-auth-library';
 
 /**
  * @see https://developers.google.com/sheets/guides/authorizing
@@ -22,18 +22,16 @@ const SCOPE = [
 ];
 
 class SpreadSheetApi {
-  constructor() {
-    this.opts = {
-      client_id: undefined,
-      client_secret: undefined,
-      redirect_url: 'http://localhost',
-      token_file: {
-        use: true,
-        path: './dist/token.json',
-      },
-    };
-    this.oAuth2 = undefined;
-  }
+  private opts = {
+    client_id: undefined,
+    client_secret: undefined,
+    redirect_url: 'http://localhost',
+    token_file: {
+      use: true,
+      path: './dist/token.json',
+    },
+  };
+  private oAuth2?: OAuth2Client;
 
   /**
    * setup
@@ -55,12 +53,21 @@ class SpreadSheetApi {
    *   }
    * }
    */
-  setup(options) {
+  setup(options: {
+    client_id: string;
+    client_secret: string;
+    redirect_url?: string;
+    token_file?: {
+      use: boolean;
+      path: string;
+    }
+  }) {
     const opts = _.assign(this.opts, options);
     this.oAuth2 = new google.auth.OAuth2(opts.client_id, opts.client_secret, opts.redirect_url);
     if (!this.opts.token_file || !this.opts.token_file.path) {
       this.opts.token_file = {
         use: false,
+        path: './dist/token.json',
       };
     }
     if (!this.opts.token_file.use) {
@@ -85,7 +92,7 @@ class SpreadSheetApi {
    * @param {string|Array} [opts.scope=SCOPE]
    * @return {string|Error} - URL to consent page.
    */
-  generateAuthUrl(opts) {
+  generateAuthUrl(opts: { scope: string[] }) {
     if (!this.oAuth2) {
       return new Error('not been setup yet.');
     }
@@ -98,56 +105,52 @@ class SpreadSheetApi {
   /**
    * get access token
    * @param {string} code
-   * @param {Function} callback
    */
-  getAccessToken(code, callback) {
+  async getAccessToken(code: string): Promise<Credentials | null | undefined> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
+      throw new Error('not been setup yet.');
     }
 
-    return this.oAuth2.getToken(code, (err, result) => {
-      if (err) {
-        err.status = 401;
-        return callback(err);
-      }
+    let result: Credentials;
+    try {
+      ({ tokens: result } = await this.oAuth2.getToken(code));
+    } catch (e) {
+      e.status = 401;
+      throw e;
+    }
 
-      if (this.opts.token_file.use) {
-        this.oAuth2.setCredentials(result);
-        fs.writeFileSync(this.opts.token_file.path, JSON.stringify(result));
-      }
-      callback(null, result);
-    });
+    if (this.opts.token_file.use && this.oAuth2 && result) {
+      this.oAuth2.setCredentials(result);
+      fs.writeFileSync(this.opts.token_file.path, JSON.stringify(result));
+    }
+    return result;
   }
 
   /**
    * refresh access token
    * @param {Credentials} [credentials] - oAuth2.getToken result
-   * @param {Function} callback
    */
-  refreshAccessToken(credentials, callback) {
+  async refreshAccessToken(credentials?: Credentials): Promise<Credentials> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
-    }
-    if (arguments.length === 1) {
-      callback = credentials;
-      credentials = undefined;
+      throw new Error('not been setup yet.');
     }
     if (credentials) {
       this.oAuth2.setCredentials(credentials);
     }
 
-    return this.oAuth2.refreshAccessToken((err, result) => {
-      if (err) {
-        err.status = 401;
-        return callback(err);
-      }
+    let result: Credentials;
+    try {
+      ({ credentials: result } = await this.oAuth2.refreshAccessToken());
+    } catch (e) {
+      e.status = 401;
+      throw e;
+    }
 
-      if (this.opts.token_file.use) {
-        this.oAuth2.setCredentials(result);
-        fs.writeFileSync(this.opts.token_file.path, JSON.stringify(result));
-      }
-      callback(null, result);
-    });
+    if (this.opts.token_file.use) {
+      this.oAuth2.setCredentials(result);
+      fs.writeFileSync(this.opts.token_file.path, JSON.stringify(result));
+    }
+    return result;
   }
 
   /**
@@ -162,25 +165,24 @@ class SpreadSheetApi {
    * @param {string} [opts.spaces]
    * @param {Function} callback
    */
-  getSpreadsheet(credentials, opts, callback) {
+  async getSpreadsheet(
+    credentials?: Credentials,
+    opts?: drive_v3.Params$Resource$Files$List,
+  ): Promise<drive_v3.Schema$File[] | undefined> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
+      throw new Error('not been setup yet.');
     }
     if (credentials) {
       this.oAuth2.setCredentials(credentials);
     }
 
     const drive = google.drive('v3');
-    drive.files.list(_.assign({
+
+    const result = await drive.files.list(_.assign({
       auth: this.oAuth2,
       q: 'mimeType=\'application/vnd.google-apps.spreadsheet\'',
-    }, opts), (err, result) => {
-      if (err) {
-        return callback(err);
-      }
-
-      callback(null, result.data.files);
-    });
+    }, opts));
+    return result.data.files;
   }
 
   /**
@@ -189,25 +191,25 @@ class SpreadSheetApi {
    * @param {string} spreadsheetId
    * @param {Function} callback
    */
-  getWorksheet(credentials, spreadsheetId, callback) {
+  async getWorksheet(
+    credentials: Credentials | undefined,
+    spreadsheetId: string,
+  ): Promise<sheets_v4.Schema$Spreadsheet> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
+      throw new Error('not been setup yet.');
     }
     if (credentials) {
       this.oAuth2.setCredentials(credentials);
     }
 
     const sheets = google.sheets('v4');
-    sheets.spreadsheets.get({
+
+    const result = await sheets.spreadsheets.get({
       auth: this.oAuth2,
       spreadsheetId,
-    }, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
-
-      callback(null, result.data);
     });
+
+    return result.data;
   }
 
   /**
@@ -217,21 +219,27 @@ class SpreadSheetApi {
    * @param {string} title - worksheet title
    * @param {number} rowCount
    * @param {number} columnCount
-   * @param {Function} callback
    */
-  addWorksheet(credentials, spreadsheetId, title, rowCount, columnCount, callback) {
+  async addWorksheet(
+    credentials: Credentials | undefined,
+    spreadsheetId: string,
+    title: string,
+    rowCount: number,
+    columnCount: number,
+  ): Promise<sheets_v4.Schema$BatchUpdateSpreadsheetResponse> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
+      throw new Error('not been setup yet.');
     }
     if (credentials) {
       this.oAuth2.setCredentials(credentials);
     }
 
     const sheets = google.sheets('v4');
-    sheets.spreadsheets.batchUpdate({
+
+    const result = await sheets.spreadsheets.batchUpdate({
       auth: this.oAuth2,
       spreadsheetId,
-      resource: {
+      requestBody: {
         requests: [
           {
             addSheet: {
@@ -254,12 +262,9 @@ class SpreadSheetApi {
           },
         ],
       },
-    }, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, result.data);
     });
+
+    return result.data;
   }
 
   /**
@@ -267,30 +272,31 @@ class SpreadSheetApi {
    * @param {Credentials} [credentials] - oAuth2.getToken result
    * @param {string} spreadsheetId
    * @param {string} sheetName
-   * @param {Function} callback
    */
-  getList(credentials, spreadsheetId, sheetName, callback) {
+  async getList(
+    credentials: Credentials | null,
+    spreadsheetId: string,
+    sheetName: string,
+  ): Promise<sheets_v4.Schema$ValueRange> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
+      throw new Error('not been setup yet.');
     }
     if (credentials) {
       this.oAuth2.setCredentials(credentials);
     }
 
     const sheets = google.sheets('v4');
-    sheets.spreadsheets.values.get({
+
+    const result = await sheets.spreadsheets.values.get({
       auth: this.oAuth2,
       spreadsheetId,
       range: sheetName,
       majorDimension: 'ROWS',
       valueRenderOption: 'FORMATTED_VALUE',
       dateTimeRenderOption: 'FORMATTED_STRING',
-    }, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, result.data);
     });
+
+    return result.data;
   }
 
   /**
@@ -299,21 +305,26 @@ class SpreadSheetApi {
    * @param {string} spreadsheetId
    * @param {string} sheetName
    * @param {Array[]} entry
-   * @param {Function} callback
    */
-  batchCells(credentials, spreadsheetId, sheetName, entry, callback) {
+  async batchCells(
+    credentials: Credentials | undefined,
+    spreadsheetId: string,
+    sheetName: string,
+    entry: any[][],
+  ): Promise<sheets_v4.Schema$BatchUpdateValuesResponse> {
     if (!this.oAuth2) {
-      return callback(new Error('not been setup yet.'));
+      throw new Error('not been setup yet.');
     }
     if (credentials) {
       this.oAuth2.setCredentials(credentials);
     }
 
     const sheets = google.sheets('v4');
-    sheets.spreadsheets.values.batchUpdate({
+
+    const result = await sheets.spreadsheets.values.batchUpdate({
       auth: this.oAuth2,
       spreadsheetId,
-      resource: {
+      requestBody: {
         valueInputOption: 'RAW',
         data: [
           {
@@ -322,13 +333,10 @@ class SpreadSheetApi {
           },
         ],
       },
-    }, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, result.data);
     });
+
+    return result.data;
   }
 }
 
-module.exports = new SpreadSheetApi();
+export default new SpreadSheetApi();

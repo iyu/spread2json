@@ -1,19 +1,43 @@
 /**
  * @fileOverview spread sheet converter
- * @name index.js
+ * @name index
  * @author Yuhei Aihara <yu.e.yu.4119@gmail.com>
  * https://github.com/iyu/spread2json
  */
 
-'use strict';
+import _ from 'lodash';
+import { Credentials } from 'google-auth-library';
+import { drive_v3, sheets_v4 } from 'googleapis';
 
-const _ = require('lodash');
-const async = require('neo-async');
+import api from './api';
+import logging from './logging';
 
-const api = require('./api');
-const logging = require('./logging');
-
-
+interface Spreadsheet extends drive_v3.Schema$File {
+  link: string;
+}
+interface Worksheet {
+  title: string;
+  sheetId: string;
+  link: string;
+}
+interface Opts {
+  attr_line: number;
+  data_line: number;
+  ref_keys: string[];
+  format: { [key: string]: { type: string; key: string; keys: string[]; } };
+  key?: string;
+  type?: string;
+  name?: string;
+}
+interface JsonSchema {
+  type: string;
+  items?: JsonSchema,
+  properties: { [key: string]: JsonSchema },
+  allOf: JsonSchema[],
+  oneOf: JsonSchema[],
+  format?: string;
+}
+type Callback<T> = (err: Error | null, result?: T) => T | undefined;
 /**
  * util
  */
@@ -21,13 +45,13 @@ const logging = require('./logging');
  * column key map 'A','B','C',,,'AA','AB',,,'AAA','AAB',,,'ZZZ'
  */
 const COLUMN_KEYMAP = (() => {
-  const map = [];
+  const map: string[] = [];
 
   /**
    * @param {number} digit
    * @param {string} value
    */
-  function genValue(digit, value) {
+  function genValue(digit: number, value: string) {
     let _value;
     for (let i = 65; i < 91; i++) {
       _value = value + String.fromCharCode(i);
@@ -50,11 +74,10 @@ const COLUMN_KEYMAP = (() => {
 
 /**
  * column to number
- * @param {string} column
  */
-function columnToNumber(column) {
+const columnToNumber = (column: string): number => {
   return COLUMN_KEYMAP.indexOf(column) + 1;
-}
+};
 
 /**
  * separate cell
@@ -64,113 +87,149 @@ function columnToNumber(column) {
  * console.log(separateCell('A1'));
  * > { cell: 'A1', column: 'A', row: 1 }
  */
-function separateCell(cell) {
-  const match = cell.match(/^(\D+)(\d+)$/);
+const separateCell = (cell: string): {
+  cell: string;
+  column: string;
+  col: number;
+  row: number;
+} => {
+  const match = cell.match(/^(\D+)(\d+)$/) || [];
   return {
     cell,
     column: match[1],
     col: columnToNumber(match[1]),
     row: parseInt(match[2], 10),
   };
-}
+};
 
 const genWorksheetLink = _.template('https://docs.google.com/spreadsheets/d/<%= spreadsheetId %>/edit#gid=<%= sheetId %>');
 
 class Spread2Json {
-  constructor() {
-    this.opts = {
-      // Cell with a custom sheet option.
-      option_cell: 'A1',
-      // Line with a data attribute.
-      attr_line: 2,
-      // Line with a attribute description.
-      desc_line: 3,
-      // Line with a data.
-      data_line: 4,
-      // ref key
-      ref_keys: ['_id'],
-      // Custom logger.
-      logger: undefined,
-      // Google API options.
-      api: {
-        client_id: undefined,
-        client_secret: undefined,
-        redirect_url: 'http://localhost',
-        token_file: {
-          use: true,
-          path: './dist/token.json',
-        },
+  private opts = {
+    // Cell with a custom sheet option.
+    option_cell: 'A1',
+    // Line with a data attribute.
+    attr_line: 2,
+    // Line with a attribute description.
+    desc_line: 3,
+    // Line with a data.
+    data_line: 4,
+    // ref key
+    ref_keys: ['_id'],
+    // Custom logger.
+    logger: undefined,
+    // Google API options.
+    api: {
+      client_id: undefined,
+      client_secret: undefined,
+      redirect_url: 'http://localhost',
+      token_file: {
+        use: true,
+        path: './dist/token.json',
       },
-    };
+    },
+  };
+  private _parser: { [key: string]: (d: any) => number|boolean|string|any; } = {
+    string: (d: any) => {
+      return String(d);
+    },
+    number: (d: any) => {
+      return Number(d);
+    },
+    num: (d: any) => {
+      return this._parser.number(d);
+    },
+    boolean: (d: any) => {
+      if (typeof d === 'boolean') {
+        return d;
+      }
+      if (typeof d === 'string') {
+        return d.toLowerCase() !== 'false' && d !== '0';
+      }
+      return !!d;
+    },
+    bool: (d: any) => {
+      return this._parser.boolean(d);
+    },
+    date: (d: any) => {
+      return new Date(d).getTime();
+    },
+    auto: (d: any) => {
+      return Number.isNaN(Number(d)) ? d : this._parser.number(d);
+    },
+  };
 
-    this._parser = {
-      string: (d) => {
-        return String(d);
-      },
-      number: (d) => {
-        return Number(d);
-      },
-      num: (d) => {
-        return this._parser.number(d);
-      },
-      boolean: (d) => {
-        if (typeof d === 'boolean') {
-          return d;
-        }
-        if (typeof d === 'string') {
-          return d.toLowerCase() !== 'false' && d !== '0';
-        }
-        return !!d;
-      },
-      bool: (d) => {
-        return this._parser.boolean(d);
-      },
-      date: (d) => {
-        return new Date(d).getTime();
-      },
-      auto: (d) => {
-        return Number.isNaN(Number(d)) ? d : this._parser.number(d);
-      },
-    };
-
-    this._stringify = {
-      string: (d) => {
-        return d;
-      },
-      number: (d) => {
-        return d;
-      },
-      num: (d) => {
-        return this._stringify.number(d);
-      },
-      boolean: (d) => {
-        return d;
-      },
-      bool: (d) => {
-        return this._stringify.boolean(d);
-      },
-      date: (d) => {
-        const date = new Date(d);
-        const yyyy = date.getFullYear();
-        const mm = `${`0${date.getMonth() + 1}`.slice(-2)}`;
-        const dd = `${`0${date.getDate()}`.slice(-2)}`;
-        const h = `${`0${date.getHours()}`.slice(-2)}`;
-        const m = `${`0${date.getMinutes()}`.slice(-2)}`;
-        const s = `${`0${date.getSeconds()}`.slice(-2)}`;
-        return `${yyyy}/${mm}/${dd} ${h}:${m}:${s}`;
-      },
-      auto: (d) => {
-        return d;
-      },
-    };
-  }
+  private _stringify: { [key: string]: (d: any) => string; } = {
+    string: (d: any) => {
+      return d;
+    },
+    number: (d: any) => {
+      return d;
+    },
+    num: (d: any) => {
+      return this._stringify.number(d);
+    },
+    boolean: (d: any) => {
+      return d;
+    },
+    bool: (d: any) => {
+      return this._stringify.boolean(d);
+    },
+    date: (d: any) => {
+      const date = new Date(d);
+      const yyyy = date.getFullYear();
+      const mm = `${`0${date.getMonth() + 1}`.slice(-2)}`;
+      const dd = `${`0${date.getDate()}`.slice(-2)}`;
+      const h = `${`0${date.getHours()}`.slice(-2)}`;
+      const m = `${`0${date.getMinutes()}`.slice(-2)}`;
+      const s = `${`0${date.getSeconds()}`.slice(-2)}`;
+      return `${yyyy}/${mm}/${dd} ${h}:${m}:${s}`;
+    },
+    auto: (d: any) => {
+      return d;
+    },
+  };
 
   /**
    * API function
    */
-  generateAuthUrl() { return api.generateAuthUrl.apply(api, arguments); }
-  getAccessToken() { return api.getAccessToken.apply(api, arguments); }
-  refreshAccessToken() { return api.refreshAccessToken.apply(api, arguments); }
+  generateAuthUrl(opts: { scope: string[]; }) { return api.generateAuthUrl(opts); }
+  async getAccessToken(code: string, callback?: Callback<Credentials | null | undefined>) {
+    if (!callback) {
+      callback = (err, result) => {
+        if (err) {
+          throw err;
+        }
+        return result;
+      };
+    }
+
+    try {
+      const result = await api.getAccessToken(code);
+      return callback(null, result);
+    } catch (e) {
+      return callback(e);
+    }
+  }
+  async refreshAccessToken(
+    credentials?: Credentials,
+    callback?: Callback<Credentials>,
+  ) {
+    if (!callback) {
+      callback = (err, result) => {
+        if (err) {
+          throw err;
+        }
+        return result;
+      };
+    }
+    try {
+      const result = await api.refreshAccessToken(credentials);
+      return callback(null, result);
+    } catch (e) {
+      return callback(e);
+    }
+  }
 
   /**
    * setup
@@ -206,19 +265,32 @@ class Spread2Json {
    *     logger: CustomLogger
    * }
    */
-  setup(options) {
-    _.assign(this.opts, options);
+  setup(options: {
+    option_cell?: string;
+    attr_line?: number;
+    data_line?: number;
+    ref_key?: string;
+    ref_keys?: string[];
+    api: {
+      client_id: string;
+      client_secret: string;
+      redirect_url?: string;
+      token_file?: { use: boolean; path: string; };
+    };
+    logger: any;
+  }) {
+    const opts = _.assign(this.opts, options);
 
-    if (this.opts.ref_key) {
-      this.opts.ref_keys = options.ref_keys || [this.opts.ref_key];
-      delete this.opts.ref_key;
+    if (opts.ref_key) {
+      opts.ref_keys = options.ref_keys || [opts.ref_key];
+      delete opts.ref_key;
     }
 
-    if (this.opts.logger) {
-      logging.logger = this.opts.logger;
+    if (opts.logger) {
+      logging.logger = opts.logger;
     }
 
-    api.setup.call(api, this.opts.api);
+    api.setup.call(api, opts.api);
     logging.logger.info('spread2json setup');
   }
 
@@ -232,7 +304,7 @@ class Spread2Json {
    * @param {string} [opts.pageToken]
    * @param {string} [opts.q]
    * @param {string} [opts.spaces]
-   * @param {Function} callback
+   * @param {Function} [callback]
    * @property {Object[]} response
    * @property {string} response[].kind - 'drive#file'
    * @property {string} response[].id - spreadsheetId
@@ -240,42 +312,88 @@ class Spread2Json {
    * @property {string} response[].mimeTpe - 'application/vnd.google-apps.spreadsheet'
    * @property {string} response[].link
    */
-  getSpreadsheet(credentials, opts, callback) {
+  async getSpreadsheet(): Promise<Spreadsheet[]>;
+  async getSpreadsheet(credentials: Credentials): Promise<Spreadsheet[]>;
+  async getSpreadsheet(opts: drive_v3.Params$Resource$Files$List): Promise<Spreadsheet[]>;
+  async getSpreadsheet(callback: Callback<Spreadsheet[]>): Promise<Spreadsheet[]>;
+  async getSpreadsheet(
+    credentials: Credentials,
+    opts: drive_v3.Params$Resource$Files$List,
+  ): Promise<Spreadsheet[]>;
+  async getSpreadsheet(
+    credentials: Credentials,
+    callback: Callback<Spreadsheet[]>,
+  ): Promise<Spreadsheet[]>;
+  async getSpreadsheet(
+    opts: drive_v3.Params$Resource$Files$List,
+    callback: Callback<Spreadsheet[]>,
+  ): Promise<Spreadsheet[]>;
+  async getSpreadsheet(
+    credentials: Credentials,
+    opts: drive_v3.Params$Resource$Files$List,
+    callback: Callback<Spreadsheet[]>,
+  ): Promise<Spreadsheet[]>;
+  async getSpreadsheet(
+    credentials?: Credentials | Callback<Spreadsheet[]> | drive_v3.Params$Resource$Files$List,
+    opts?: drive_v3.Params$Resource$Files$List | Callback<Spreadsheet[]>,
+    callback?: Callback<Spreadsheet[]>,
+  ): Promise<Spreadsheet[] | undefined> {
     if (arguments.length === 1) {
-      callback = credentials;
-      opts = undefined;
-      credentials = undefined;
-    }
-    if (arguments.length === 2) {
-      if (_.has(credentials, ['access_token'])) {
-        callback = opts;
+      if (typeof credentials === 'function') {
+        callback = credentials as Callback<Spreadsheet[]>;
         opts = undefined;
-      } else {
-        callback = opts;
-        opts = credentials;
+        credentials = undefined;
+      } else if (!_.has(credentials, ['access_token'])) {
+        opts = credentials as drive_v3.Params$Resource$Files$List;
         credentials = undefined;
       }
-    }
-    api.getSpreadsheet(credentials, opts, (err, result) => {
-      if (err) {
-        return callback(err);
+    } else if (arguments.length === 2) {
+      if (typeof opts === 'function') {
+        callback = opts as Callback<Spreadsheet[]>;
+        if (!_.has(credentials, ['access_token'])) {
+          opts = credentials as drive_v3.Params$Resource$Files$List;
+          credentials = undefined;
+        } else {
+          opts = undefined;
+        }
       }
+    }
+    if (!callback) {
+      callback = (err: Error | null, result?: Spreadsheet[]) => {
+        if (err) {
+          throw err;
+        }
+        return result;
+      };
+    }
 
-      _.forEach(result, (data) => {
-        data.link = genWorksheetLink({
-          spreadsheetId: data.id,
+    let result;
+    try {
+      result = await api.getSpreadsheet(
+        credentials as Credentials,
+        opts as drive_v3.Params$Resource$Files$List,
+      );
+    } catch (e) {
+      return callback(e);
+    }
+
+    const list: Spreadsheet[] = _.map(result, (sheet) => {
+      const data = _.assign({}, sheet, {
+        link: genWorksheetLink({
+          spreadsheetId: sheet.id,
           sheetId: 0,
-        });
+        }),
       });
-      callback(null, result);
+      return data;
     });
+    return callback(null, list);
   }
 
   /**
    * get worksheet info in spreadsheet
    * @param {Credentials} [credentials] - oAuth2.getToken result
    * @param {string} spreadsheetId
-   * @param {Function} callback
+   * @param {Function} [callback]
    * @property {Object[]} response
    * @property {string} response[].title
    * @property {integer} response[].sheetId
@@ -285,30 +403,59 @@ class Spread2Json {
    * spreadsheetId = '1YXVzaaxqkPKsr-excIOXScnTQC7y_DKrUKs0ukzSIgo'
    * sheetId = 0
    */
-  getWorksheet(credentials, spreadsheetId, callback) {
-    if (arguments.length === 2) {
-      callback = spreadsheetId;
-      spreadsheetId = credentials;
+  async getWorksheet(spreadsheetId: string): Promise<Worksheet[] | undefined>;
+  async getWorksheet(
+    spreadsheetId: string,
+    callback: Callback<Worksheet[]>,
+  ): Promise<Worksheet[] | undefined>;
+  async getWorksheet(
+    credentials: Credentials,
+    spreadsheetId: string,
+  ): Promise<Worksheet[] | undefined>;
+  async getWorksheet(
+    credentials: Credentials,
+    spreadsheetId: string,
+    callback: Callback<Worksheet[]>,
+  ): Promise<Worksheet[] | undefined>;
+  async getWorksheet(
+    credentials?: Credentials | string,
+    spreadsheetId?: string | Callback<Worksheet[]>,
+    callback?: Callback<Worksheet[]>,
+  ): Promise<Worksheet[] | undefined> {
+    if (!_.has(credentials, 'access_token')) {
+      callback = spreadsheetId as Callback<Worksheet[]>;
+      spreadsheetId = credentials as string;
       credentials = undefined;
     }
-    api.getWorksheet(credentials, spreadsheetId, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
+    if (!callback) {
+      callback = (err: Error | null, result?: Worksheet[]) => {
+        if (err) {
+          throw err;
+        }
+        return result;
+      };
+    }
 
-      const list = _.map(_.get(result, 'sheets'), (sheet) => {
-        const data = {
-          title: _.get(sheet, ['properties', 'title'], ''),
-          sheetId: _.get(sheet, ['properties', 'sheetId'], 0),
-        };
-        data.link = genWorksheetLink({
+    let result;
+    try {
+      result = await api.getWorksheet(credentials as Credentials, spreadsheetId as string);
+    } catch (e) {
+      return callback(e);
+    }
+    const list: Worksheet[] = _.map(_.get(result, 'sheets'), (sheet) => {
+      const sheetId = _.get(sheet, ['properties', 'sheetId'], 0);
+      const data = {
+        title: _.get(sheet, ['properties', 'title'], ''),
+        sheetId,
+        link: genWorksheetLink({
           spreadsheetId,
-          sheetId: data.sheetId,
-        });
-        return data;
-      });
-      callback(null, list);
+          sheetId,
+        }),
+      };
+      return data;
     });
+
+    return callback(null, list);
   }
 
   /**
@@ -318,7 +465,7 @@ class Spread2Json {
    * @param {string} [title] - worksheet title
    * @param {number} [rowCount=50]
    * @param {number} [colCount=10]
-   * @param {Function} callback
+   * @param {Function} [callback]
    * @property {Object} response
    * @property {string} response.title
    * @property {integer} response.sheetId
@@ -327,60 +474,97 @@ class Spread2Json {
    * > url = 'https://docs.google.com/spreadsheets/d/1YXVzaaxqkPKsr-excIOXScnTQC7y_DKrUKs0ukzSIgo/edit#gid=0'
    * spreadsheetId = '1YXVzaaxqkPKsr-excIOXScnTQC7y_DKrUKs0ukzSIgo'
    */
-  addWorksheet(credentials, spreadsheetId, title, rowCount, colCount, callback) {
-    if (arguments.length === 2) {
-      callback = colCount;
+  async addWorksheet(
+    spreadsheetId: string,
+    title?: string,
+    rowCount?: number,
+    colCount?: number,
+    callback?: Callback<Worksheet>,
+  ): Promise<Worksheet | undefined>;
+  async addWorksheet(
+    credentials: Credentials,
+    spreadsheetId: string,
+    title?: string,
+    rowCount?: number,
+    colCount?: number,
+    callback?: Callback<Worksheet>,
+  ): Promise<Worksheet | undefined>;
+  async addWorksheet(
+    credentials?: Credentials | string,
+    spreadsheetId?: string,
+    title?: string | number,
+    rowCount?: number,
+    colCount?: number | Callback<Worksheet>,
+    callback?: Callback<Worksheet>,
+  ): Promise<Worksheet | undefined> {
+    if (!_.has(credentials, ['access_token'])) {
+      callback = colCount as Callback<Worksheet>;
       colCount = rowCount;
-      rowCount = title;
+      rowCount = title as number;
       title = spreadsheetId;
-      spreadsheetId = credentials;
+      spreadsheetId = credentials as string;
       credentials = undefined;
     }
     rowCount = _.isNumber(rowCount) ? rowCount : 50;
     colCount = _.isNumber(colCount) ? colCount : 10;
-    api.addWorksheet(credentials, spreadsheetId, title, rowCount, colCount, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
-
-      const data = {
-        title: _.get(result, ['replies', 0, 'addSheet', 'properties', 'title'], ''),
-        sheetId: _.get(result, ['replies', 0, 'addSheet', 'properties', 'sheetId'], 0),
+    if (!callback) {
+      callback = (err: Error | null, result?: Worksheet): Worksheet | undefined => {
+        if (err) {
+          throw err;
+        }
+        return result;
       };
-      data.link = genWorksheetLink({
+    }
+
+    let result;
+    try {
+      result = await api.addWorksheet(
+        credentials as Credentials,
+        spreadsheetId as string,
+        title as string,
+        rowCount,
+        colCount,
+      );
+    } catch (e) {
+      return callback(e);
+    }
+
+    const sheetId = _.get(result, ['replies', 0, 'addSheet', 'properties', 'sheetId'], 0);
+    const data = {
+      title: _.get(result, ['replies', 0, 'addSheet', 'properties', 'title'], ''),
+      sheetId,
+      link: genWorksheetLink({
         spreadsheetId,
-        sheetId: data.sheetId,
-      });
-      callback(null, data);
-    });
+        sheetId,
+      }),
+    };
+    return callback(null, data);
   }
 
 
   /**
    * format
    * @param {Object[]} cells
-   * @param {string} cells.cell
-   * @param {string} cells.column
-   * @param {number} cells.row
-   * @param {string} cells.value
+   * @param {string} cells[].cell
+   * @param {string} cells[].column
+   * @param {number} cells[].row
+   * @param {string} cells[].value
    * @private
    * @example
    * var cells = [
    *     { cell: 'A1', column: 'A', row: 1, value: '{}' },,,,
    * ]
    */
-  _format(cells) {
-    const opts = {};
-    let beforeRow;
-    let idx = {};
-    const list = [];
-
-    _.assign(opts, {
+  _format(cells: { cell: string; column: string; row: number; value: string; }[]) {
+    const opts: Opts = {
       attr_line: this.opts.attr_line,
       data_line: this.opts.data_line,
       ref_keys: this.opts.ref_keys,
       format: {},
-    });
+    };
+    let beforeRow: number;
+    let idx: { [key: string]: { type: string; value: number; } } = {};
+    const list: { [key: string]: any[]; }[] = [];
 
     _.forEach(cells, (cell) => {
       if (beforeRow !== cell.row) {
@@ -407,7 +591,7 @@ class Spread2Json {
         const keys = key.split('.');
 
         opts.format[cell.column] = {
-          type: type && type[1] && type[1].toLowerCase(),
+          type: (type && type[1] && type[1].toLowerCase()) || '',
           key,
           keys,
         };
@@ -415,14 +599,12 @@ class Spread2Json {
       }
 
       const format = opts.format[cell.column];
-      let data;
-      let _idx;
 
       if (cell.row < opts.data_line || !format) {
         return;
       }
       if (format.type === 'index') {
-        _idx = parseInt(cell.value, 10);
+        const _idx = parseInt(cell.value, 10);
         if (!idx[format.key] || idx[format.key].value !== _idx) {
           idx[format.key] = {
             type: 'format',
@@ -442,7 +624,7 @@ class Spread2Json {
         list.push({});
       }
 
-      data = _.last(list);
+      let data = _.last(list) as { [key:string]: any[] } | any;
       _.forEach(format.keys, (_key, i) => {
         const isArray = /^#/.test(_key);
         const isSplitArray = /^\$/.test(_key);
@@ -458,7 +640,7 @@ class Spread2Json {
         if (i + 1 !== format.keys.length) {
           if (isArray) {
             __key = format.keys.slice(0, i + 1).join('.');
-            _idx = idx[__key];
+            let _idx = idx[__key];
             if (!_idx) {
               idx[__key] = {
                 type: 'normal',
@@ -477,7 +659,7 @@ class Spread2Json {
 
         if (isArray) {
           __key = format.keys.slice(0, i + 1).join('.');
-          _idx = idx[__key];
+          let _idx = idx[__key];
           if (!_idx) {
             idx[__key] = {
               type: 'normal',
@@ -486,7 +668,7 @@ class Spread2Json {
             _idx = idx[__key];
           }
           data = data[_key];
-          _key = _idx.value;
+          _key = String(_idx.value);
         }
 
         if (data[_key]) {
@@ -515,7 +697,11 @@ class Spread2Json {
    * @param {Object} data
    * @private
    */
-  _findOrigin(dataMap, opts, data) {
+  _findOrigin(
+    dataMap: { [key: string]: any },
+    opts: { key?: string; type: string; ref_keys: string[] },
+    data: any,
+  ) {
     let origin;
     if (data.__ref) {
       origin = dataMap[data.__ref];
@@ -593,39 +779,80 @@ class Spread2Json {
    * @param {Function} callback
    * @see #getWorksheet arguments.key and returns list.id
    */
-  getWorksheetDatas(credentials, spreadsheetId, worksheetNames, callback) {
-    if (arguments.length === 3) {
-      callback = worksheetNames;
-      worksheetNames = spreadsheetId;
-      spreadsheetId = credentials;
+  async getWorksheetDatas(spreadsheetId: string, worksheetNames: string[]): Promise<any>;
+  async getWorksheetDatas(
+    spreadsheetId: string,
+    worksheetNames: string[],
+    callback: (err: Error|null, result?: any[], errList?: { name: string; error: Error }[]) => any,
+  ): Promise<any>;
+  async getWorksheetDatas(
+    credentials: Credentials,
+    spreadsheetId: string,
+    worksheetNames: string[],
+  ): Promise<any>;
+  async getWorksheetDatas(
+    credentials: Credentials,
+    spreadsheetId: string,
+    worksheetNames: string[],
+    callback: (err: Error|null, result?: any[], errList?: { name: string, error: Error }[]) => any,
+  ): Promise<any>;
+  async getWorksheetDatas(
+    credentials?: Credentials | string,
+    spreadsheetId?: string | string[],
+    worksheetNames?:
+      string[] |
+      ((err: Error | null, result?: any[], errList?: { name: string, error: Error }[]) => any),
+    callback?: (err: Error|null, result?: any[], errList?: { name: string, error: Error }[]) => any,
+  ): Promise<any> {
+    if (!_.has(credentials, 'access_token')) {
+      callback = worksheetNames as
+        (err: Error | null, result?: any[], errList?: { name: string; error: Error }[]) => any;
+      worksheetNames = spreadsheetId as string[];
+      spreadsheetId = credentials as string;
       credentials = undefined;
     }
-    let errList;
-    async.map(worksheetNames, (sheetName, next) => {
-      api.getList(credentials, spreadsheetId, sheetName, (err, result) => {
-        if (err) {
-          return next(err);
-        }
+    if (!callback) {
+      callback =
+        (err: Error | null, result?: any[], errList?: { name: string, error: Error; }[]) => {
+          if (err) {
+            throw err;
+          }
+          return [result, errList];
+        };
+    }
 
-        const cells = _.transform(result.values, (ret, columns, i) => {
-          _.forEach(columns, (value, j) => {
-            if (value === '') {
-              return;
-            }
-            const rowName = i + 1;
-            const columnName = COLUMN_KEYMAP[j];
-            ret.push({
-              cell: columnName + rowName,
-              column: columnName,
-              row: rowName,
-              value,
+    let errList: any[] | undefined;
+    let results;
+    try {
+      results = await Promise.all(_.map(worksheetNames as string[], async (sheetName: string) => {
+        const result = await api.getList(
+          credentials as Credentials,
+          spreadsheetId as string,
+          sheetName,
+        );
+        const cells = _.transform(
+          result.values as any[][],
+          (ret: { cell: string; column: string; row: number; value: string; }[], columns, i) => {
+            _.forEach(columns, (value, j) => {
+              if (value === '') {
+                return;
+              }
+              const rowName = i + 1;
+              const columnName = COLUMN_KEYMAP[j];
+              ret.push({
+                cell: columnName + rowName,
+                column: columnName,
+                row: rowName,
+                value,
+              });
             });
-          });
-        }, []);
+          },
+          [],
+        );
 
         let _result;
         try {
-          _result = this._format(cells);
+          _result = _.assign({ name: '' }, this._format(cells));
         } catch (e) {
           logging.logger.error('invalid sheet format.', sheetName);
           errList = errList || [];
@@ -633,20 +860,18 @@ class Spread2Json {
             name: sheetName,
             error: e,
           });
-          return next();
+          return;
         }
 
         _result.name = sheetName;
 
-        next(null, _result);
-      });
-    }, (err, result) => {
-      if (err) {
-        return callback(err);
-      }
+        return _result;
+      }));
+    } catch (e) {
+      return callback(e);
+    }
 
-      callback(null, _.compact(result), errList);
-    });
+    return callback(null, _.compact(results), errList);
   }
 
   /**
@@ -655,12 +880,23 @@ class Spread2Json {
    * @param {string} sheetDatas.name - work sheet name
    * @param {Object} sheetDatas.opts - sheet option
    * @param {Object[]} sheetDatas.list - sheet data list
-   * @param {Function} callback
+   * @param {Function} [callback]
    */
-  toJson(sheetDatas, callback) {
-    const collectionMap = {};
-    const optionMap = {};
-    const errors = {};
+  toJson(
+    sheetDatas: { name: string; opts: Opts; list: any[] }[],
+    callback?: (err: any | null, collectionMap: any, optionMap: any) => any,
+  ) {
+    const collectionMap: { [key: string]: any } = {};
+    const optionMap: { [key: string]: Opts } = {};
+    const errors: { [key: string]: any[] } = {};
+    if (!callback) {
+      callback = (err: any | null, _collectionMap: any, _optionMap: any) => {
+        if (err) {
+          throw err;
+        }
+        return [_collectionMap, _optionMap];
+      };
+    }
     _.forEach(sheetDatas, (sheetData) => {
       const opts = sheetData.opts;
       const name = opts.name || sheetData.name;
@@ -684,7 +920,7 @@ class Spread2Json {
           });
           dataMap[keys] = data;
         } else {
-          const origin = this._findOrigin(dataMap, opts, data);
+          const origin = this._findOrigin(dataMap, opts as { type: string } & Opts, data);
           if (origin) {
             _.forEach(data, (d, k) => {
               if (/^__ref/.test(k)) {
@@ -702,7 +938,7 @@ class Spread2Json {
       });
     });
 
-    callback(_.isEmpty(errors) ? null : errors, collectionMap, optionMap);
+    return callback(_.isEmpty(errors) ? null : errors, collectionMap, optionMap);
   }
 
   /**
@@ -711,9 +947,9 @@ class Spread2Json {
    * @param {string[]} refkeys - ref keys
    * @param {string} [path=''] - data path
    */
-  convertSchema2Format(schema, refKeys, path) {
+  convertSchema2Format(schema: JsonSchema, refKeys: string[], path?: string): string[] {
     path = path || '';
-    let result = [];
+    let result: string[] = [];
     switch (schema.type) {
       case 'string':
       case 'boolean':
@@ -753,9 +989,13 @@ class Spread2Json {
         });
         break;
       case 'array': {
-        const arrayMark = schema.items.type === 'object' ? '#' : '$';
-        const format = this.convertSchema2Format(schema.items, refKeys, path || arrayMark);
-        result.push.apply(result, format);
+        if (schema.items) {
+          const arrayMark = schema.items.type === 'object' ? '#' : '$';
+          const format = this.convertSchema2Format(schema.items, refKeys, path || arrayMark);
+          result.push.apply(result, format);
+        } else {
+          throw new Error(`invalid schema type. ${schema.type}`);
+        }
         break;
       }
       default:
@@ -775,8 +1015,16 @@ class Spread2Json {
    * @param {string[]} format
    * @param {Object[]} datas
    */
-  splitSheetData(name, refKeys, format, datas) {
-    const map = {
+  splitSheetData(name: string, refKeys: string[], format: string[], datas: any[]) {
+    const map: {
+      [key: string]: {
+        name: string,
+        opts: { name: string, ref_keys: string[]; attr_line: number; desc_line: number; },
+        format: string[],
+        description: string[],
+        datas: any[],
+      }
+    } = {
       [name]: {
         name,
         opts: _.defaults({
@@ -794,8 +1042,8 @@ class Spread2Json {
       },
     };
 
-    const matches = [];
-    const checks = [];
+    const matches: (RegExpMatchArray | null)[] = [];
+    const checks: RegExp[] = [];
     _.forEach(format, (keys) => {
       const checked = _.some(checks, (regexp) => {
         return regexp.test(keys);
@@ -808,23 +1056,25 @@ class Spread2Json {
       if (match && match.length >= 2) {
         // keys:'obj.#arr.obj2.#arr2.str' -> match:[keys,'obj.','arr']
         match = keys.match(/^([^#]+)?#([^#.]+)\..+$/);
-        matches.push(match);
-        // ^obj.#arr\.
-        checks.push(new RegExp(`^${(match[1] ? match[1] : '')}#${match[2]}\\.`));
+        if (match) {
+          matches.push(match);
+          // ^obj.#arr\.
+          checks.push(new RegExp(`^${(match[1] ? match[1] : '')}#${match[2]}\\.`));
+        }
       }
     });
 
     _.forEach(format, (keys) => {
-      let match;
-      let check;
+      let match: string[] = [];
+      let check: RegExp | string = '';
       const checked = _.some(checks, (regexp, i) => {
-        match = matches[i];
+        match = matches[i] || [];
         check = regexp;
         return regexp.test(keys);
       });
       if (!checked) {
         map[name].format.push(keys);
-        map[name].description.push(_.last(keys.replace(/#|\$/g, '').replace(/:.+$/, '').split('.')));
+        map[name].description.push(_.last(keys.replace(/#|\$/g, '').replace(/:.+$/, '').split('.')) || '');
         return;
       }
       const key = (match[1] ? match[1] : '') + match[2];
@@ -840,7 +1090,7 @@ class Spread2Json {
         map[_sheetName].description = _.clone(refKeys);
       }
       map[_sheetName].format.push(_keys);
-      map[_sheetName].description.push(_.last(_keys.replace(/#|\$/g, '.').replace(/:.+$/, '').split('.')));
+      map[_sheetName].description.push(_.last(_keys.replace(/#|\$/g, '.').replace(/:.+$/, '').split('.')) || '');
     });
 
     return _.values(map);
@@ -856,7 +1106,7 @@ class Spread2Json {
    * @param {Object[]} worksheetData.datas - datas
    * @param {string} [worksheetData.name] - sheet name
    */
-  toCells(worksheetData) {
+  toCells(worksheetData: { opts?: any; format: string[]; description: string[]; datas: any[]; name?: string }) { // eslint-disable-line max-len
     const self = this;
     const cells = [];
     const opts = worksheetData.opts || {};
@@ -897,10 +1147,10 @@ class Spread2Json {
      * add cell data to cells
      * @private
      */
-    function addCell(data) {
+    function addCell(data: any) {
       _.forEach(worksheetData.format, (attr, i) => {
         try {
-          const last = _.last(attr.split('.'));
+          const last = _.last(attr.split('.')) || '';
           const hasArray = /#/.test(attr);
           const isSplitArray = /^\$/.test(last);
           const type = attr.replace(/^.+:(.+)$/, '$1');
@@ -910,7 +1160,7 @@ class Spread2Json {
           if (hasArray) {
             const keys = attr.replace(/#(\w+).*$/, '$1');
             const arr = _.get(data, keys);
-            _.forEach(arr, (d, j) => {
+            _.forEach(arr, (d, j: number) => {
               value = _.get(data, searchKey.replace(/#(\w+)/, `$1[${j}]`));
               if (value !== undefined) {
                 if (isSplitArray) {
@@ -953,9 +1203,13 @@ class Spread2Json {
 
     _.forEach(worksheetData.datas, (data) => {
       if (opts.type === 'array') {
-        const origin = _.transform(opts.ref_keys || this.opts.ref_keys, (result, refKey, i) => {
-          result[`__ref_${i}`] = data[refKey];
-        }, {});
+        const origin = _.transform(
+          opts.ref_keys || this.opts.ref_keys,
+          (result: { [key: string]: any }, refKey: string, i) => {
+            result[`__ref_${i}`] = data[refKey];
+          },
+          {},
+        );
         const datas = _.get(data, opts.key);
         _.forEach(datas, (_data) => {
           _data = _.assign({}, origin, _data);
@@ -991,21 +1245,77 @@ class Spread2Json {
    * @param {Function} callback
    * @see #getWorksheet arguments.key and returns list.id
    */
-  updateWorksheetDatas(credentials, spreadsheetId, worksheetName, cells, callback) {
-    if (arguments.length === 4) {
-      callback = cells;
-      cells = worksheetName;
+  async updateWorksheetDatas(
+    spreadsheetId: string,
+    worksheetName: string,
+    cells: { col: number; row: number; value: string }[],
+  ): Promise<sheets_v4.Schema$BatchUpdateValuesResponse>;
+  async updateWorksheetDatas(
+    spreadsheetId: string,
+    worksheetName: string,
+    cells: { col: number; row: number; value: string }[],
+    callback: Callback<sheets_v4.Schema$BatchUpdateValuesResponse>,
+  ): Promise<sheets_v4.Schema$BatchUpdateValuesResponse>;
+  async updateWorksheetDatas(
+    credentials: Credentials,
+    spreadsheetId: string,
+    worksheetName: string,
+    cells: { col: number; row: number; value: string }[],
+  ): Promise<sheets_v4.Schema$BatchUpdateValuesResponse>;
+  async updateWorksheetDatas(
+    credentials: Credentials,
+    spreadsheetId: string,
+    worksheetName: string,
+    cells: { col: number; row: number; value: string }[],
+    callback: Callback<sheets_v4.Schema$BatchUpdateValuesResponse>,
+  ): Promise<sheets_v4.Schema$BatchUpdateValuesResponse>;
+  async updateWorksheetDatas(
+    credentials?: Credentials | string,
+    spreadsheetId?: string,
+    worksheetName?: string | { col: number; row: number; value: string }[],
+    cells?: { col: number; row: number; value: string }[] |
+      Callback<sheets_v4.Schema$BatchUpdateValuesResponse>,
+    callback?: Callback<sheets_v4.Schema$BatchUpdateValuesResponse>,
+  ) {
+    if (arguments.length === 3) {
+      cells = worksheetName as { col: number; row: number; value: string; }[];
       worksheetName = spreadsheetId;
-      spreadsheetId = credentials;
-      credentials = undefined;
+      spreadsheetId = credentials as string;
+    } else if (arguments.length === 4) {
+      if (typeof cells === 'function') {
+        callback = cells;
+        cells = worksheetName as { col: number; row: number; value: string; }[];
+        worksheetName = spreadsheetId;
+        spreadsheetId = credentials as string;
+        credentials = undefined;
+      }
+    }
+    if (!callback) {
+      callback = (err: Error | null, result?: sheets_v4.Schema$BatchUpdateValuesResponse) => {
+        if (err) {
+          throw err;
+        }
+        return result;
+      };
     }
 
-    const entry = [];
-    _.forEach(cells, (cell) => {
+    const entry: any[][] = [];
+    _.forEach(cells as { col: number; row: number; value: string; }[], (cell) => {
       entry[cell.row] = entry[cell.row] || [];
       entry[cell.row][cell.col - 1] = cell.value;
     });
-    api.batchCells(credentials, spreadsheetId, worksheetName, entry, callback);
+
+    try {
+      const result = await api.batchCells(
+        credentials as Credentials,
+        spreadsheetId as string,
+        worksheetName as string,
+        entry,
+      );
+      return callback(null, result);
+    } catch (e) {
+      return callback(e);
+    }
   }
 
   static get COLUMN_KEYMAP() {
@@ -1013,5 +1323,5 @@ class Spread2Json {
   }
 }
 
-module.exports = new Spread2Json();
+export default new Spread2Json();
 
