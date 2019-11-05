@@ -1,3 +1,3 @@
-import spread2json from './lib';
+import spread2json from './src';
 
 export = spread2json;
