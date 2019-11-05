@@ -3,7 +3,7 @@ const sinon = require('sinon');
 
 const _ = require('lodash');
 const spread2json = require('../');
-const { default: api } = require('../lib/api');
+const { default: api } = require('../build/src/api');
 
 const opts = require('./opts');
 const mock = require('./mock');
@@ -24,7 +24,7 @@ const WORKSHEET_NAMES = [
 describe('spread2json', () => {
   before(() => {
     spread2json.setup({ api: opts.installed });
-    const sandbox = sinon.sandbox.create();
+    const sandbox = sinon.createSandbox();
     sandbox.stub(api, 'getWorksheet').resolves(mock.getWorksheet);
     const stubGetList = sandbox.stub(api, 'getList');
     _.forEach(mock.getList, (d, key) => {
