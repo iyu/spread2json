@@ -1,5 +1,7 @@
 [![NPM version][npm-image]][npm-url]
 [![Downloads][downloads-image]][downloads-url]
+[![GitHub Actions status][github-action-image]][github-url]
+
 
 Spread2Json
 ==========
@@ -164,6 +166,8 @@ sample project.
 5. Run test suite with the `npm test; npm run lint` command and confirm that it passes
 5. Create new Pull Request
 
+[github-url]: https://github.com/iyu/spread2json
+[github-action-image]: https://github.com/iyu/spread2json/workflows/Lint%20and%20Test/badge.svg
 [npm-image]: https://img.shields.io/npm/v/spread2json.svg?style=flat-square
 [npm-url]: https://www.npmjs.com/package/spread2json
 [downloads-image]: https://img.shields.io/npm/dm/spread2json.svg?style=flat-square

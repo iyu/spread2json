@@ -1,11 +1,11 @@
-name: triggered on pushes
+name: Lint and Test
 
 on:
   - push
 
 jobs:
   lint:
-    name: eslint
+    name: Lint and Test
     
     runs-on: ubuntu-latest
     
@@ -23,3 +23,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         job-name: eslint
+    - name: test
+      run: npm test
+      env:
+        TZ: Asia/Tokyo
