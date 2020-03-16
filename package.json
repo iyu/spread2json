@@ -19,11 +19,11 @@
   "devDependencies": {
     "@types/lodash": "^4.14.144",
     "@types/node": "^12.12.3",
-    "@typescript-eslint/eslint-plugin": "^2.6.0",
-    "@typescript-eslint/parser": "^2.6.0",
-    "eslint": "^6.6.0",
+    "@typescript-eslint/eslint-plugin": "^2.23.0",
+    "@typescript-eslint/parser": "^2.23.0",
+    "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-import": "^2.20.1",
     "mocha": "^5.2.0",
     "should": "^11.1.1",
     "sinon": "^7.5.0",
@@ -34,7 +34,7 @@
     "prepublish": "npm run build",
     "pretest": "npm run build",
     "test": "mocha -r should -R spec --recursive test",
-    "lint": "eslint ."
+    "lint": "eslint --ext .ts ."
   },
   "repository": {
     "type": "git",

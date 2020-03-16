@@ -25,7 +25,7 @@ class OriginalLogger implements ILogger {
     CYAN: '\u001b[36m',
     WHITE: '\u001b[37m',
     RESET: '\u001b[0m',
-  }
+  };
 
   private _getDateLine() {
     const date = new Date();
